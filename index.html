@@ -15,27 +15,15 @@
                 linear-gradient(180deg,var(--bg1),var(--bg2));
     color:#fff;
     overflow:hidden;
-    -webkit-font-smoothing:antialiased;
-    -moz-osx-font-smoothing:grayscale;
   }
-
-  /* Canvas fills the screen */
   canvas{display:block; width:100vw; height:100vh; pointer-events:auto;}
-
-  /* UI overlay */
   .ui {
     position: fixed; inset:16px; pointer-events:none; z-index:30;
     display:flex; gap:12px; align-items:flex-start; justify-content:space-between;
   }
-
-  .left {
-    pointer-events:auto;
-  }
-  .controls {
-    display:flex; gap:10px; align-items:center;
-  }
+  .left { pointer-events:none; }
+  .controls { display:flex; gap:10px; align-items:center; pointer-events:auto; }
   button {
-    pointer-events:auto;
     background: linear-gradient(135deg,#ff6aa3,#ff9cc9);
     border: none; color: white;
     padding:10px 14px; border-radius:12px; font-weight:700;
@@ -46,11 +34,7 @@
     background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.06);
     box-shadow:none; color:#ffd6e6; font-weight:600;
   }
-  .big {
-    padding:14px 18px; font-size:1.05rem;
-  }
-
-  /* Centered heading */
+  .big { padding:14px 18px; font-size:1.05rem; }
   .center {
     position: fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:25;
     text-align:center; pointer-events:none;
@@ -65,12 +49,9 @@
     margin:0; color:#ffd9e6; opacity:0.85;
     font-size: clamp(13px, 2.2vw, 16px);
   }
-
-  /* message overlay */
   .msg {
     position: fixed; left:50%; transform:translateX(-50%);
-    bottom:18vh; z-index:26; pointer-events:none;
-    text-align:center;
+    bottom:18vh; z-index:26; text-align:center; pointer-events:none;
   }
   .msg .line {
     font-family: "Dancing Script", "Segoe Script", cursive;
@@ -81,8 +62,6 @@
     transition: all .6s cubic-bezier(.2,.9,.2,1);
   }
   .msg .line.show { opacity:1; transform: translateY(0) scale(1); }
-
-  /* final heart */
   .final {
     position: fixed; inset:0; display:flex; align-items:center; justify-content:center;
     z-index:28; pointer-events:none;
@@ -93,58 +72,42 @@
     transition: all 1s cubic-bezier(.2,.9,.2,1);
   }
   .heart.show { opacity:1; transform: scale(1) rotate(0deg); }
-
   .final-text {
     margin-top:10px; font-family: "Dancing Script", cursive;
     color:#ffd3e8; font-size: clamp(18px, 3.5vw, 28px); opacity:0;
     transform: translateY(10px); transition: all .9s ease;
   }
   .final-text.show { opacity:1; transform: translateY(0); }
-
-  /* bottom small note */
   .note {
     position: fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:31;
     color: rgba(255,210,225,0.9); font-size:12px; opacity:0.95; pointer-events:none;
   }
-
-  /* responsive spacing */
-  @media (max-width:540px){
-    .center{ top:48% }
-    .msg{ bottom:24vh; }
-  }
 </style>
 </head>
 <body>
-  <!-- Canvas for fireworks -->
   <canvas id="c"></canvas>
 
-  <!-- UI overlay -->
   <div class="ui">
     <div class="left">
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div class="center" style="pointer-events:none">
-          <h1 class="title">Happy Birthday, Bhavya ✨</h1>
-          <p class="subtitle">Tap the sky to launch a special fireworks show — each burst carries a message just for you.</p>
-        </div>
+      <div class="center">
+        <h1 class="title">Happy Birthday, Bhavya ✨</h1>
+        <p class="subtitle">Tap the sky to launch a special fireworks show — each burst carries a message just for you.</p>
       </div>
     </div>
-
-    <div class="controls" style="pointer-events:auto">
+    <div class="controls">
       <button id="launchBtn" class="big">Launch Fireworks 🎆</button>
       <button id="replayBtn" class="ghost">Replay</button>
       <button id="musicBtn" class="ghost">Play Music ♪</button>
     </div>
   </div>
 
-  <!-- Messages -->
-  <div class="msg" aria-live="polite">
+  <div class="msg">
     <div id="msg1" class="line">Happy Birthday Bhavya 🎉</div>
     <div id="msg2" class="line">You’re my brightest star 🌟</div>
     <div id="msg3" class="line">You’re my forever ♾️</div>
   </div>
 
-  <!-- Final heart and text -->
-  <div class="final" aria-hidden="true">
+  <div class="final">
     <div style="text-align:center">
       <div id="heart" class="heart">💖</div>
       <div id="finalText" class="final-text">Forever Yours, always and forever.</div>
@@ -153,315 +116,98 @@
 
   <div class="note">Tip: Tap anywhere on the sky to create more bursts ✨</div>
 
-  <!-- Optional music -->
   <audio id="bg" loop preload="auto">
-    <source src="assets/mine.mp3" type="audio/mpeg">
+    <source src="https://www.bensound.com/bensound-music/bensound-romantic.mp3" type="audio/mpeg">
   </audio>
 
 <script>
 (() => {
-  // Canvas setup
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
   let W = canvas.width = innerWidth;
   let H = canvas.height = innerHeight;
-  let particles = [];
-  let fireworks = [];
-  let hue = 330; // pinkish
-  let limiterTotal = 0;
+  let particles = [], fireworks = [], timers = [];
   let running = false;
-  let scheduled = 0;
 
-  // Messages control
-  const msgEls = [document.getElementById('msg1'), document.getElementById('msg2'), document.getElementById('msg3')];
+  const msgEls = [msg1, msg2, msg3];
   const heart = document.getElementById('heart');
   const finalText = document.getElementById('finalText');
-  let messageStep = 0;
-
-  // audio
   const audio = document.getElementById('bg');
   const musicBtn = document.getElementById('musicBtn');
+
   musicBtn.addEventListener('click', () => {
-    if (audio.paused) {
-      audio.play().catch(()=>{});
-      musicBtn.textContent = 'Pause Music ♪';
-    } else {
-      audio.pause();
-      musicBtn.textContent = 'Play Music ♪';
-    }
+    if (audio.paused) { audio.play().catch(()=>{}); musicBtn.textContent = 'Pause Music ♪'; }
+    else { audio.pause(); musicBtn.textContent = 'Play Music ♪'; }
   });
 
-  // small helpers
   function rand(min,max){ return Math.random()*(max-min)+min; }
   function dist(x1,y1,x2,y2){ return Math.hypot(x1-x2,y1-y2); }
 
-  // Particle class for explosions
   class Particle {
-    constructor(x,y, color) {
-      this.x = x; this.y = y;
-      this.vx = rand(-6,6);
-      this.vy = rand(-10, -2);
-      this.alpha = 1;
-      this.decay = rand(0.007, 0.015);
-      this.color = color;
-      this.size = rand(1.8,3.8);
-      this.gravity = 0.06;
+    constructor(x,y,color){
+      this.x=x; this.y=y; this.vx=rand(-6,6); this.vy=rand(-10,-2);
+      this.alpha=1; this.decay=rand(0.007,0.015); this.color=color;
+      this.size=rand(1.8,3.8); this.gravity=0.06;
     }
-    update(){
-      this.vy += this.gravity;
-      this.x += this.vx;
-      this.y += this.vy;
-      this.alpha -= this.decay;
-      if(this.alpha <= 0) this.alpha = 0;
-    }
-    draw(){
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
+    update(){ this.vy+=this.gravity; this.x+=this.vx; this.y+=this.vy; this.alpha-=this.decay; if(this.alpha<0)this.alpha=0; }
+    draw(){ ctx.save(); ctx.globalAlpha=this.alpha; ctx.fillStyle=this.color; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,2*Math.PI); ctx.fill(); ctx.restore(); }
   }
 
-  // Firework rocket
   class Firework {
-    constructor(sx, sy, tx, ty, color) {
-      this.x = sx; this.y = sy;
-      this.sx = sx; this.sy = sy;
-      this.tx = tx; this.ty = ty;
-      this.distanceToTarget = dist(sx,sy,tx,ty);
-      this.distanceTraveled = 0;
-      this.speed = rand(4,7);
-      this.angle = Math.atan2(ty - sy, tx - sx);
-      this.vx = Math.cos(this.angle) * this.speed;
-      this.vy = Math.sin(this.angle) * this.speed;
-      this.trail = [];
-      this.color = color;
-      this.exploded = false;
+    constructor(sx,sy,tx,ty,color){
+      this.x=sx; this.y=sy; this.sx=sx; this.sy=sy; this.tx=tx; this.ty=ty;
+      this.distanceToTarget=dist(sx,sy,tx,ty); this.distanceTraveled=0;
+      this.speed=rand(4,7); this.angle=Math.atan2(ty-sy,tx-sx);
+      this.vx=Math.cos(this.angle)*this.speed; this.vy=Math.sin(this.angle)*this.speed;
+      this.trail=[]; this.color=color;
     }
-    update(index){
-      this.trail.push({x:this.x,y:this.y});
-      if(this.trail.length > 6) this.trail.shift();
-      this.x += this.vx;
-      this.y += this.vy;
-      this.distanceTraveled = dist(this.sx,this.sy,this.x,this.y);
-      // if reached target
-      if(this.distanceTraveled >= this.distanceToTarget || this.y < 50) {
-        this.explode();
-        fireworks.splice(index,1);
-      }
+    update(i){
+      this.trail.push({x:this.x,y:this.y}); if(this.trail.length>6)this.trail.shift();
+      this.x+=this.vx; this.y+=this.vy;
+      this.distanceTraveled=dist(this.sx,this.sy,this.x,this.y);
+      if(this.distanceTraveled>=this.distanceToTarget||this.y<50){ this.explode(); fireworks.splice(i,1); }
     }
-    explode(){
-      const count = Math.floor(rand(40,80));
-      const colors = generatePalette();
-      for(let i=0;i<count;i++){
-        const col = colors[Math.floor(Math.random()*colors.length)];
-        particles.push(new Particle(this.tx, this.ty, col));
-      }
-      // show a message with this explosion (sequence)
-      triggerMessage();
-    }
-    draw(){
-      ctx.save();
-      // draw trail
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for(let i=0;i<this.trail.length;i++){
-        const p = this.trail[i];
-        if(i===0) ctx.moveTo(p.x,p.y);
-        else ctx.lineTo(p.x,p.y);
-      }
-      ctx.stroke();
-      // rocket head
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x,this.y,3,0,Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
+    explode(){ const count=Math.floor(rand(40,80)), colors=generatePalette(); for(let i=0;i<count;i++)particles.push(new Particle(this.tx,this.ty,colors[Math.floor(Math.random()*colors.length)])); }
+    draw(){ ctx.save(); ctx.strokeStyle=this.color; ctx.lineWidth=2; ctx.beginPath(); for(let i=0;i<this.trail.length;i++){ const p=this.trail[i]; if(i===0)ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);} ctx.stroke(); ctx.fillStyle=this.color; ctx.beginPath(); ctx.arc(this.x,this.y,3,0,2*Math.PI); ctx.fill(); ctx.restore(); }
   }
 
-  // generate warm pink-ish palette
-  function generatePalette(){
-    const base = Math.floor(rand(300,350));
-    const arr = [];
-    for(let i=0;i<6;i++){
-      const h = (base + i*6 + Math.random()*20) % 360;
-      arr.push(`hsl(${h}, 80%, ${55 + Math.random()*10}%)`);
-    }
-    return arr;
-  }
+  function generatePalette(){ const base=Math.floor(rand(300,350)), arr=[]; for(let i=0;i<6;i++){const h=(base+i*6+Math.random()*20)%360; arr.push(`hsl(${h},80%,${55+Math.random()*10}%)`);} return arr; }
 
-  // update loop
-  function loop(){
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = "rgba(4,6,12,0.18)";
-    ctx.fillRect(0,0,W,H);
-
-    // draw trails smoother
-    ctx.globalCompositeOperation = 'lighter';
-
-    // draw particles
-    for(let i=particles.length-1;i>=0;i--){
-      const p = particles[i];
-      p.update();
-      p.draw();
-      if(p.alpha <= 0.01){
-        particles.splice(i,1);
-      }
-    }
-
-    // fireworks rockets
-    for(let i=fireworks.length-1;i>=0;i--){
-      fireworks[i].update(i);
-      fireworks[i].draw();
-    }
-
+  function loop(){ ctx.globalCompositeOperation='source-over'; ctx.fillStyle="rgba(4,6,12,0.18)"; ctx.fillRect(0,0,W,H); ctx.globalCompositeOperation='lighter';
+    for(let i=particles.length-1;i>=0;i--){const p=particles[i]; p.update(); p.draw(); if(p.alpha<=0.01)particles.splice(i,1);}
+    for(let i=fireworks.length-1;i>=0;i--){fireworks[i].update(i); fireworks[i].draw();}
     requestAnimationFrame(loop);
   }
 
-  // Resize handler
-  function onResize(){
-    W = canvas.width = innerWidth;
-    H = canvas.height = innerHeight;
-  }
-  addEventListener('resize', onResize);
+  function launch(x=null,y=null){ const sx=Math.random()*W, sy=H+20, tx=x??rand(60,W-60), ty=y??rand(60,H/2.2); const color=generatePalette()[0]; fireworks.push(new Firework(sx,sy,tx,ty,color)); }
+  canvas.addEventListener('click',e=>{const rect=canvas.getBoundingClientRect(); launch(e.clientX-rect.left,e.clientY-rect.top);});
 
-  // Launch a firework to random target or provided x,y
-  function launch(x=null,y=null){
-    const sx = Math.random()*W; // from bottom random x
-    const sy = H + 20;
-    const tx = x !== null ? x : rand(60, W-60);
-    const ty = y !== null ? y : rand(60, H/2.2);
-    const colors = generatePalette();
-    const color = colors[Math.floor(Math.random()*colors.length)];
-    fireworks.push(new Firework(sx, sy, tx, ty, color));
-  }
-
-  // user interaction: click/tap to launch
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    launch(x,y);
-  });
-
-  // Sequenced show: launches a set of fireworks and shows messages
+  function clearTimers(){ for(const t of timers)clearTimeout(t); timers=[]; }
+  function resetScene(){ clearTimers(); particles=[]; fireworks=[]; hideMessages(); hideFinal(); }
   function startShow(){
-    if(running) return;
-    running = true;
-    messageStep = 0;
-    hideMessages();
-    hideFinal();
-    // schedule several bursts
-    const schedule = [
-      {count:6, delay:0},
-      {count:8, delay:1200},
-      {count:10, delay:2600},
-      {count:10, delay:4400},
-      {count:12, delay:6400}
-    ];
-    let offset = 0;
-    schedule.forEach(s => {
-      setTimeout(()=> {
-        for(let i=0;i<s.count;i++){
-          setTimeout(()=> launch(), i*120);
-        }
-      }, offset + s.delay);
-      offset += s.delay;
-    });
-
-    // After initial bursts, show messages sequentially
-    setTimeout(()=> showMessage(0), 1800);
-    setTimeout(()=> showMessage(1), 4200);
-    setTimeout(()=> showMessage(2), 6800);
-
-    // Finale heart
-    setTimeout(()=> showFinal(), 9200);
-
-    // end
-    setTimeout(()=> { running = false; }, 11800);
+    resetScene(); running=true;
+    const schedule=[{c:6,d:0},{c:8,d:1200},{c:10,d:2600},{c:10,d:4400},{c:12,d:6400}];
+    schedule.forEach(s=>{timers.push(setTimeout(()=>{for(let i=0;i<s.c;i++)timers.push(setTimeout(()=>launch(),i*120));},s.d));});
+    timers.push(setTimeout(()=>showMessage(0),1800));
+    timers.push(setTimeout(()=>showMessage(1),4200));
+    timers.push(setTimeout(()=>showMessage(2),6800));
+    timers.push(setTimeout(()=>showFinal(),9200));
+    timers.push(setTimeout(()=>running=false,11800));
   }
 
-  // show messages function
-  function showMessage(i){
-    if(i < msgEls.length){
-      msgEls.forEach(el => el.classList.remove('show'));
-      const el = msgEls[i];
-      el.classList.add('show');
-      // small spark burst near center
-      const centerX = W/2 + rand(-120,120);
-      const centerY = H/2 - rand(20,120);
-      for(let j=0;j<6;j++) setTimeout(()=> launch(centerX + rand(-60,60), centerY + rand(-60,60)), j*80);
-    }
-  }
+  function showMessage(i){ if(i<msgEls.length){ msgEls.forEach(e=>e.classList.remove('show')); msgEls[i].classList.add('show'); const cx=W/2,cy=H/2; for(let j=0;j<6;j++)timers.push(setTimeout(()=>launch(cx+rand(-60,60),cy+rand(-60,60)),j*80)); }}
   function hideMessages(){ msgEls.forEach(e=>e.classList.remove('show')); }
+  function showFinal(){ heart.classList.add('show'); finalText.classList.add('show'); const cx=W/2,cy=H/2-60; for(let i=0;i<20;i++)timers.push(setTimeout(()=>launch(cx+rand(-120,120),cy+rand(-120,120)),i*120)); }
+  function hideFinal(){ heart.classList.remove('show'); finalText.classList.remove('show'); }
 
-  // show final heart & text
-  function showFinal(){
-    heart.classList.add('show');
-    finalText.classList.add('show');
-    // bigger, gentle fireworks around center
-    const cx = W/2, cy = H/2 - 60;
-    for(let i=0;i<20;i++){
-      setTimeout(()=> launch(cx + rand(-120,120), cy + rand(-120,120)), i*120);
-    }
-  }
-  function hideFinal(){
-    heart.classList.remove('show');
-    finalText.classList.remove('show');
-  }
+  function ambientHearts(){ const fxLayer=document.createElement('div'); fxLayer.style.position='fixed'; fxLayer.style.inset=0; fxLayer.style.pointerEvents='none'; document.body.appendChild(fxLayer);
+    setInterval(()=>{const h=document.createElement('div'); h.textContent=['💖','💕','💗','💞'][Math.floor(Math.random()*4)]; h.style.position='absolute'; h.style.left=Math.random()*100+'vw'; h.style.top=window.innerHeight+'px'; h.style.fontSize=(12+Math.random()*28)+'px'; h.style.opacity=0.9; h.style.transition='transform 6s linear, opacity 1.2s ease'; fxLayer.appendChild(h); requestAnimationFrame(()=>h.style.transform='translateY(-120vh)'); setTimeout(()=>h.remove(),7000);},900);}
+  
+  function restartShow(){ resetScene(); startShow(); }
+  document.getElementById('replayBtn').addEventListener('click', restartShow);
+  document.getElementById('launchBtn').addEventListener('click', restartShow);
 
-  // replay button
-  document.getElementById('replayBtn').addEventListener('click', () => {
-    startShow();
-  });
-
-  // main launch button
-  document.getElementById('launchBtn').addEventListener('click', () => {
-    startShow();
-  });
-
-  // trigger message when an explosion occurs (extra)
-  function triggerMessage(){
-    // small chance to pop a tiny floating text (kept simple for now)
-    if(Math.random() < 0.08){
-      // do nothing extra to not overcrowd
-    }
-  }
-
-  // warm initial hint: small random hearts rising
-  function ambientHearts(){
-    const fxLayer = document.createElement('div');
-    fxLayer.style.position = 'fixed';
-    fxLayer.style.inset = 0;
-    fxLayer.style.pointerEvents = 'none';
-    document.body.appendChild(fxLayer);
-    setInterval(()=>{
-      const h = document.createElement('div');
-      h.textContent = ['💖','💕','💗','💞'][Math.floor(Math.random()*4)];
-      h.style.position='absolute';
-      h.style.left = Math.random()*100 + 'vw';
-      h.style.top = window.innerHeight + 'px';
-      h.style.fontSize = (12 + Math.random()*28) + 'px';
-      h.style.opacity = 0.9;
-      h.style.transition = 'transform 6s linear, opacity 1.2s ease';
-      fxLayer.appendChild(h);
-      requestAnimationFrame(()=> h.style.transform = `translateY(-120vh)`);
-      setTimeout(()=> h.remove(),7000);
-    }, 900);
-  }
-
-  // start loops
-  loop();
-  ambientHearts();
-
-  // start show on load lightly (optional)
-  // setTimeout(startShow, 800);
-
+  loop(); ambientHearts();
 })();
 </script>
 </body>
